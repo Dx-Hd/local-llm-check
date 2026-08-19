@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>本地部署教程 · 本地大模型部署检测站</title>
+<meta name="description" content="开源大模型本地部署教程：Ollama、LM Studio、llama.cpp、vLLM 详细步骤，含量化科普与常见问题">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>📖 本地部署教程</h1>
+    <p class="sub">从零开始，在自己的电脑上跑起开源大模型。按难度选择：Ollama（最简单）→ LM Studio（图形界面）→ llama.cpp（进阶）→ vLLM（服务器级）</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="index.html">← 返回检测站</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap tutorial">
+
+  <nav class="toc">
+    <a href="#ollama">1. Ollama（推荐）</a>
+    <a href="#lmstudio">2. LM Studio</a>
+    <a href="#llamacpp">3. llama.cpp</a>
+    <a href="#vllm">4. vLLM（服务器）</a>
+    <a href="#quant">5. 量化科普</a>
+    <a href="#faq">6. 常见问题</a>
+    <a href="#links">7. 资源汇总</a>
+  </nav>
+
+  <!-- ================= Ollama ================= -->
+  <section id="ollama">
+    <h2>1️⃣ Ollama — 一行命令跑大模型 <span class="tag easy">最简单</span></h2>
+    <p>Ollama 是目前最流行的本地模型管理工具，自动处理量化、显存分配、上下文等，一条命令即可运行。支持 Windows / macOS / Linux，全中文界面友好。</p>
+
+    <h3>① 安装</h3>
+    <ol>
+      <li>打开官网 <a href="https://ollama.com/download" target="_blank" rel="noopener">ollama.com/download</a>，下载 Windows 安装包（约 700MB，含运行时）</li>
+      <li>双击安装，装完后右下角托盘会出现 Ollama 图标</li>
+    </ol>
+
+    <h3>② 运行模型</h3>
+    <p>打开终端（Win+R 输入 cmd 回车），输入：</p>
+    <pre>ollama run qwen3:8b</pre>
+    <p>首次运行会自动下载模型（几 GB，视网速而定），之后就进入聊天界面，直接输入问题即可。退出用 <code>/bye</code>。</p>
+
+    <h3>③ 常用命令</h3>
+    <pre>ollama list                      # 查看已下载的模型
+ollama pull qwen3:8b             # 只下载不运行
+ollama run deepseek-r1:7b        # 运行 DeepSeek 推理模型
+ollama rm qwen3:8b               # 删除模型释放磁盘
+ollama ps                        # 查看当前加载的模型与显存占用</pre>
+
+    <h3>④ 修改模型存放位置（可选，默认在 C 盘）</h3>
+    <p>设置环境变量 <code>OLLAMA_MODELS</code> 指向新目录（如 <code>D:\ollama-models</code>），然后重启 Ollama。</p>
+
+    <h3>⑤ 集成到桌面/API</h3>
+    <ul>
+      <li>Ollama 自带 OpenAI 兼容 API：<code>http://localhost:11434/v1</code>，任何支持 OpenAI 的客户端（ChatBox、NextChat、Cherry Studio、Dify 等）填这个地址即可接入</li>
+      <li>推荐搭配图形界面 <a href="https://chatboxai.app/zh" target="_blank" rel="noopener">ChatBox</a> 或 <a href="https://github.com/CherryHQ/cherry-studio" target="_blank" rel="noopener">Cherry Studio</a>，体验接近 ChatGPT</li>
+    </ul>
+    <p class="hint">💡 检测站里每个模型行都有一个「Ollama」按钮，点击即可复制对应的 <code>ollama pull</code> 命令。</p>
+  </section>
+
+  <!-- ================= LM Studio ================= -->
+  <section id="lmstudio">
+    <h2>2️⃣ LM Studio — 全图形界面 <span class="tag easy">最简单</span></h2>
+    <p>完全图形化操作，无需命令行，内置模型搜索下载，直接下载 GGUF 文件即可运行，适合新手。</p>
+    <ol>
+      <li>到 <a href="https://lmstudio.ai/" target="_blank" rel="noopener">lmstudio.ai</a> 下载安装</li>
+      <li>打开后在「搜索」页查找模型（如 <code>Qwen3 8B</code>），选择 <code>Q4_K_M</code> 量化版本下载</li>
+      <li>回到「聊天」页，选择刚下载的模型，即可对话</li>
+      <li>设置里可开启「本地 API 服务器」，供其他程序调用</li>
+    </ol>
+    <p class="hint">⚠️ LM Studio 内置下载走 HuggingFace，国内网络可能较慢，可在设置里改用 ModelScope 镜像，或直接到 ModelScope 下载 GGUF 文件后拖入。</p>
+  </section>
+
+  <!-- ================= llama.cpp ================= -->
+  <section id="llamacpp">
+    <h2>3️⃣ llama.cpp — 自由与性能 <span class="tag mid">进阶</span></h2>
+    <p>llama.cpp 是 GGUF 格式的源头项目，纯 C/C++ 实现，CPU 效率最高，支持 NVIDIA/AMD/Intel 显卡加速（CUDA/Vulkan/Metal）。</p>
+
+    <h3>① 获取可执行文件</h3>
+    <p>Windows 用户直接到 <a href="https://github.com/ggml-org/llama.cpp/releases" target="_blank" rel="noopener">GitHub Releases</a> 下载 <code>llama-bXXXX-bin-win-cuda-cu12.4-x64.zip</code>（CUDA 版）或 <code>...-win-avx2-x64.zip</code>（纯 CPU 版），解压即可，无需编译。</p>
+
+    <h3>② 下载 GGUF 模型</h3>
+    <p>从 HuggingFace 下载（如 <a href="https://huggingface.co/Qwen/Qwen3-8B-Instruct-GGUF" target="_blank" rel="noopener">Qwen3-8B-Instruct-GGUF</a>），选 <code>Qwen3-8B-Instruct-Q4_K_M.gguf</code>。</p>
+    <p class="hint">💡 国内用户建议到 <a href="https://modelscope.cn" target="_blank" rel="noopener">ModelScope</a> 搜索同名 GGUF 仓库下载，速度快得多。</p>
+
+    <h3>③ 运行</h3>
+    <pre>llama-cli -m Qwen3-8B-Instruct-Q4_K_M.gguf -n 512 -c 8192
+# -n 生成的最大 token 数，-c 上下文长度</pre>
+    <p>GPU 版会自动检测并使用显卡（<code>-ngl 999</code> 强制全部层进显存）。</p>
+
+    <h3>④ 常用工具</h3>
+    <pre>llama-server -m model.gguf --port 8080   # 启动 OpenAI 兼容 API 服务
+llama-bench -m model.gguf                 # 实测本机 tok/s 速度
+llama-gguf-split -m model.gguf --split-max-size 4G  # 拆分大文件</pre>
+    <p>配合 <code>llama-bench</code> 可以实测你的机器真实速度，和本站估算值对照。</p>
+  </section>
+
+  <!-- ================= vLLM ================= -->
+  <section id="vllm">
+    <h2>4️⃣ vLLM — 服务器级高吞吐 <span class="tag hard">高阶</span></h2>
+    <p>vLLM 是工业级推理框架，适合大显存（多卡）机器、API 服务、并发多用户场景。对单机个人使用通常不如 Ollama 方便。</p>
+    <pre># 需要 Python 3.9+ 和 NVIDIA GPU（CUDA）
+pip install vllm
+vllm serve Qwen/Qwen2.5-7B-Instruct --gpu-memory-utilization 0.9</pre>
+    <p>启动后提供 OpenAI 兼容 API：<code>http://localhost:8000/v1</code>。常用参数：<code>--max-model-len 32768</code>（上下文长度）、<code>--tensor-parallel-size 2</code>（双卡并行）。</p>
+    <p class="hint">⚠️ vLLM 一般需要 24GB 以上显存才划算，且目前主要支持 NVIDIA（AMD 需 ROCm 构建）。低配机器请优先 Ollama。</p>
+  </section>
+
+  <!-- ================= 量化 ================= -->
+  <section id="quant">
+    <h2>5️⃣ 量化是什么？为什么 Q4 能跑 Q8 跑不了？</h2>
+    <p>大模型的权重是浮点数。量化就是把权重从 16 位浮点压缩到更少的位数，文件变小、占用显存内存变小、速度变快，代价是轻微精度损失。</p>
+    <ul>
+      <li><b>Q4_K_M</b>（≈4.5 bit/参数）：体积约为 FP16 的 1/4，精度损失很小，<b>本地部署首选</b></li>
+      <li><b>Q8_0</b>（8 bit）：几乎无损，体积约为 FP16 的一半</li>
+      <li><b>FP16</b>：原始精度，体积最大，一般只有大显存显卡才用</li>
+      <li><b>IQ4_XS / Q3_K_M</b>：更激进压缩，牺牲更多精度换体积，8GB 内存的老机器可用</li>
+    </ul>
+    <p>规律：<b>模型文件能塞进显存就用 GPU，塞不进就部分 offload 或纯 CPU</b>。MoE 模型例外——文件大但激活参数少，CPU 跑也不慢。</p>
+  </section>
+
+  <!-- ================= FAQ ================= -->
+  <section id="faq">
+    <h2>6️⃣ 常见问题</h2>
+    <h3>Q1：提示「显存不足 / CUDA out of memory」怎么办？</h3>
+    <ul>
+      <li>换更小的量化：Q8_0 → Q4_K_M → Q4_0 / IQ4_XS</li>
+      <li>换更小的模型：8B → 4B → 1.5B</li>
+      <li>减少上下文长度（-c 8192 → 4096），KV cache 也占显存</li>
+      <li>Ollama 中退出其他模型再运行（<code>ollama ps</code> 查看占用）</li>
+    </ul>
+    <h3>Q2：CPU 推理太慢怎么办？</h3>
+    <ul>
+      <li>确认内存是<b>双通道</b>且跑在最高频率（CPU 推理吃内存带宽）</li>
+      <li>确认已用 AVX2/AVX512 构建（llama.cpp 的 avx2 版比通用版快 30%+）</li>
+      <li>选 MoE 模型（Qwen3-30B-A3B 在 CPU 上接近 7B 的速度）</li>
+      <li>降低上下文长度与批处理大小</li>
+    </ul>
+    <h3>Q3：下载慢 / 连不上 HuggingFace？</h3>
+    <ul>
+      <li>国内优先用 <a href="https://modelscope.cn" target="_blank" rel="noopener">ModelScope</a>（阿里，速度快）</li>
+      <li>Ollama 可设置镜像：环境变量 <code>OLLAMA_HOST</code> 无关，镜像见社区方案（如 <code>hf-mirror.com</code>：<code>export HF_ENDPOINT=https://hf-mirror.com</code> 适用于 HF 工具）</li>
+    </ul>
+    <h3>Q4：模型回答是英文 / 中文不好？</h3>
+    <p>选中文优化模型：Qwen（通义千问）、GLM（智谱）、DeepSeek 系列中文支持最好。</p>
+    <h3>Q5：8GB 内存的老电脑能玩吗？</h3>
+    <p>能。Qwen3-0.6B / Qwen3-1.7B / Llama-3.2-1B（Q4）都只要 1GB 左右内存，速度也快；再往上 3B、4B 也能勉强跑，但建议 16GB 内存起步体验更好。</p>
+    <h3>Q6：本站估算的速度准吗？</h3>
+    <p>误差一般在 ±30% 内，用于横向对比足够。想知道精确值，用 llama.cpp 的 <code>llama-bench</code> 实测即可。</p>
+  </section>
+
+  <!-- ================= 资源 ================= -->
+  <section id="links">
+    <h2>7️⃣ 资源汇总</h2>
+    <ul>
+      <li><a href="https://ollama.com/library" target="_blank" rel="noopener">Ollama 模型库</a> — 所有支持一行安装的模型</li>
+      <li><a href="https://huggingface.co/models" target="_blank" rel="noopener">HuggingFace</a> — 全球最大模型仓库（GGUF 官方/社区版）</li>
+      <li><a href="https://modelscope.cn" target="_blank" rel="noopener">ModelScope 魔搭</a> — 阿里模型仓库，国内速度快</li>
+      <li><a href="https://github.com/ggml-org/llama.cpp" target="_blank" rel="noopener">llama.cpp</a> — GGUF 推理引擎源码</li>
+      <li><a href="https://github.com/vllm-project/vllm" target="_blank" rel="noopener">vLLM</a> — 高吞吐推理框架</li>
+      <li><a href="https://lmstudio.ai/" target="_blank" rel="noopener">LM Studio</a> — 图形化推理客户端</li>
+      <li><a href="https://github.com/CherryHQ/cherry-studio" target="_blank" rel="noopener">Cherry Studio</a> — 桌面 AI 客户端（支持本地 Ollama）</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>本地大模型部署检测站 · 教程仅供参考，具体以各项目官方文档为准</p>
+    <p><a href="index.html">← 返回检测站</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

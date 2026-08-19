@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>本地大模型部署检测站 · Local LLM Fit Checker</title>
+<meta name="description" content="检测你的电脑配置，判断能否本地部署主流开源大模型，对比不同配置下的 token 生成速度，一键获取模型下载地址与部署教程">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>🧠 本地大模型部署检测站</h1>
+    <p class="sub">检测电脑配置 → 判断能否本地跑开源模型 → 对比各模型 token 速度 → 一键跳转下载 & 教程</p>
+    <div class="hero-actions">
+      <button id="btn-detect" class="btn primary">🔍 检测我的电脑</button>
+      <button id="btn-bench" class="btn ghost">⚡ 浏览器基准校准（可选）</button>
+      <a class="btn ghost" href="tutorials.html">📖 部署教程</a>
+    </div>
+    <div id="bench-result" class="bench-result"></div>
+    <div id="status" class="status"></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============ 检测结果 ============ -->
+  <section id="specs-box" class="card" style="display:none">
+    <h2>🖥️ 检测到的配置</h2>
+    <div class="spec-grid">
+      <div class="spec"><div class="k">CPU 核心</div><div class="v" id="spec-cpu">—</div></div>
+      <div class="spec"><div class="k">内存</div><div class="v" id="spec-ram">—</div></div>
+      <div class="spec"><div class="k">GPU</div><div class="v" id="spec-gpu">—</div></div>
+      <div class="spec"><div class="k">显存</div><div class="v" id="spec-vram">—</div></div>
+      <div class="spec"><div class="k">可用磁盘</div><div class="v" id="spec-disk">—</div></div>
+      <div class="spec"><div class="k">系统</div><div class="v" id="spec-os">—</div></div>
+    </div>
+    <p class="hint">⚠️ 浏览器只能粗略读取硬件信息（内存为 Chromium 粗估、显存按 GPU 型号查表）。请核对下方手动修正面板，结果更准确。</p>
+
+    <details class="manual">
+      <summary>✏️ 手动修正配置（推荐核对）</summary>
+      <div class="manual-grid">
+        <label>CPU 核心数
+          <input type="number" id="manual-cores" min="1" max="256" value="8">
+        </label>
+        <label>内存 (GB)
+          <input type="number" id="manual-ram" min="2" max="512" value="16">
+        </label>
+        <label>GPU 型号
+          <select id="manual-gpu"></select>
+        </label>
+        <label>显存 (GB，可留空)
+          <input type="number" id="manual-vram" min="0" max="128" placeholder="如 8">
+        </label>
+        <label>内存档次（影响 CPU 推理速度）
+          <select id="manual-tier">
+            <option value="ddr3-single">DDR3 单通道（~8 GB/s）</option>
+            <option value="ddr3-dual">DDR3 双通道（~17 GB/s）</option>
+            <option value="ddr4-single">DDR4 单通道（~17 GB/s）</option>
+            <option value="ddr4-dual">DDR4 双通道（~32 GB/s）</option>
+            <option value="ddr5-single">DDR5 单通道（~28 GB/s）</option>
+            <option value="ddr5-dual">DDR5 双通道（~60 GB/s）</option>
+            <option value="server-dual">服务器多通道（~90 GB/s）</option>
+            <option value="unknown">不确定</option>
+          </select>
+        </label>
+        <div class="manual-apply"><button id="btn-apply-manual" class="btn">应用修正</button></div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ 为你推荐 ============ -->
+  <section id="rec-section" class="card" style="display:none">
+    <h2>🏆 根据你的配置推荐</h2>
+    <div id="recommend" class="rec-grid"></div>
+  </section>
+
+  <!-- ============ 模型对比 ============ -->
+  <section class="card">
+    <h2>📊 开源模型对比</h2>
+
+    <div class="toolbar">
+      <div class="quant-tabs">
+        <span class="quant-tab active" data-quant="Q4_K_M">Q4_K_M（推荐，省资源）</span>
+        <span class="quant-tab" data-quant="Q8_0">Q8_0（高质量）</span>
+        <span class="quant-tab" data-quant="FP16">FP16（原始精度）</span>
+      </div>
+      <div class="filters">
+        <span class="chip active" data-tag="全部">全部</span>
+        <span class="chip" data-tag="对话">对话</span>
+        <span class="chip" data-tag="推理">推理</span>
+        <span class="chip" data-tag="代码">代码</span>
+        <span class="chip" data-tag="MoE">MoE</span>
+        <span class="chip" data-tag="国产">国产</span>
+        <span class="chip" data-tag="多模态">多模态</span>
+        <span class="chip" data-tag="大模型">70B+</span>
+      </div>
+      <div class="toolbar-right">
+        <input id="search" type="search" placeholder="搜索模型名…">
+        <select id="sort">
+          <option value="speed">按预计速度排序</option>
+          <option value="size">按体积排序</option>
+          <option value="fit">按可运行性排序</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table id="model-table">
+        <thead>
+          <tr>
+            <th>模型</th>
+            <th>参数量</th>
+            <th>文件大小</th>
+            <th>需内存</th>
+            <th>需显存</th>
+            <th>你的电脑</th>
+            <th>预计速度</th>
+            <th>下载</th>
+          </tr>
+        </thead>
+        <tbody id="model-table-body"></tbody>
+      </table>
+    </div>
+    <p class="hint">预计速度为<b>生成速度</b>（tok/s，越大越快），基于你的配置与社区基准的估算值，实际受内存带宽、散热、后台进程影响。</p>
+  </section>
+
+  <!-- ============ 速度对比图 ============ -->
+  <section class="card">
+    <h2>📈 速度对比（按你的配置估算，绿色=全量GPU/CPU流畅，黄色=受限）</h2>
+    <div id="chart" class="chart"></div>
+  </section>
+
+  <!-- ============ 图例/说明 ============ -->
+  <section class="card">
+    <h2>📖 怎么看这个表</h2>
+    <ul class="legend">
+      <li><span class="badge green">✓ 可运行</span> 配置满足需求，建议直接部署</li>
+      <li><span class="badge yellow">⚠ 可用（受限）</span> 显存不够走 CPU 混合推理，或仅核显/低配，速度偏慢但可用</li>
+      <li><span class="badge red">✗ 内存不足</span> 连内存都不够，需换量化或加内存</li>
+      <li><b>需内存</b> = 模型文件 + 约 4GB 系统开销；<b>需显存</b> = 模型文件 + 约 1.5GB KV缓存开销</li>
+      <li><b>MoE</b> 模型（如 Qwen3-30B-A3B）虽然文件大，但每次只激活少量参数，<b>速度接近小模型</b>，是低配机器跑大模型的捷径</li>
+      <li>量化说明：Q4_K_M 精度损失小、体积小，日常使用首选；Q8_0 几乎无损但体积翻倍；FP16 是原始权重，一般仅高端显卡使用</li>
+      <li>估算误差来源：内存类型/通道数、CPU 核心数、散热降频、Ollama/llama.cpp 版本差异等</li>
+    </ul>
+    <p class="disclaimer">本站所有检测结果与速度估算仅供参考，均为浏览器端本地计算，不上传任何数据。数据与公式见 <code>js/models.js</code>、<code>js/estimate.js</code>。</p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>本地大模型部署检测站 · 纯前端实现 · 数据不出浏览器</p>
+    <p><a href="tutorials.html">部署教程（Ollama / LM Studio / llama.cpp / vLLM）</a></p>
+  </div>
+</footer>
+
+<script src="js/models.js"></script>
+<script src="js/estimate.js"></script>
+<script src="js/hardware.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
