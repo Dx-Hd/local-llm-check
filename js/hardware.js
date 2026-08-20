@@ -82,6 +82,15 @@ function applyOverride(hw) {
     if (saved.gpuChoice) {
       // 用户手动选择 GPU（"none" 表示无独显）
       if (saved.gpuChoice === 'none') hw.gpu = null;
+      else if (saved.gpuChoice === 'other') {
+        hw.gpu = {
+          name: saved.gpuCustomName || '自定义 GPU',
+          vram: saved.gpuVram || null,
+          bw: saved.gpuBw || null,
+          kind: saved.gpuKind || 'nvidia',
+          vendor: '自定义',
+        };
+      }
       else {
         const g = GPU_DB.find((x) => x.name === saved.gpuChoice);
         if (g) hw.gpu = g;

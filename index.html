@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
 <title>本地大模型部署检测站 · Local LLM Fit Checker</title>
 <meta name="description" content="检测你的电脑配置，判断能否本地部署主流开源大模型，对比不同配置下的 token 生成速度，一键获取模型下载地址与部署教程">
 <link rel="stylesheet" href="css/style.css">
@@ -14,12 +15,12 @@
     <h1>🧠 本地大模型部署检测站</h1>
     <p class="sub">检测电脑配置 → 判断能否本地跑开源模型 → 对比各模型 token 速度 → 一键跳转下载 & 教程</p>
     <div class="hero-actions">
-      <button id="btn-detect" class="btn primary">🔍 检测我的电脑</button>
+      <button id="btn-detect" class="btn primary">🔍 检测本机配置</button>
       <button id="btn-bench" class="btn ghost">⚡ 浏览器基准校准（可选）</button>
       <a class="btn ghost" href="tutorials.html">📖 部署教程</a>
     </div>
     <div id="bench-result" class="bench-result"></div>
-    <div id="status" class="status"></div>
+    <div id="status" class="status" aria-live="polite"></div>
   </div>
 </header>
 
@@ -47,8 +48,21 @@
         <label>内存 (GB)
           <input type="number" id="manual-ram" min="2" max="512" value="16">
         </label>
+        <label>GPU 厂商（自定义型号时使用）
+          <select id="manual-gpu-kind">
+            <option value="nvidia">NVIDIA</option>
+            <option value="amd">AMD</option>
+            <option value="intel">Intel</option>
+            <option value="apple">Apple Silicon</option>
+            <option value="igpu">核显 / 集成显卡</option>
+          </select>
+        </label>
         <label>GPU 型号
+          <input type="search" id="manual-gpu-search" placeholder="搜索型号，如 RTX 5080">
           <select id="manual-gpu"></select>
+        </label>
+        <label id="manual-custom-name-wrap" style="display:none">自定义型号
+          <input type="text" id="manual-custom-name" placeholder="如 Radeon Pro W7900">
         </label>
         <label>显存 (GB，可留空)
           <input type="number" id="manual-vram" min="0" max="128" placeholder="如 8">
@@ -79,6 +93,15 @@
   <!-- ============ 模型对比 ============ -->
   <section class="card">
     <h2>📊 开源模型对比</h2>
+
+    <div class="model-sync-panel">
+      <div>
+        <div class="sync-title">模型目录</div>
+        <div id="model-sync-status" class="sync-status" aria-live="polite">内置模型库已就绪，可手动更新公开来源</div>
+      </div>
+      <button id="btn-sync-models" class="btn sync-button">↻ 更新模型库</button>
+    </div>
+    <div id="live-models" class="live-models" aria-live="polite"></div>
 
     <div class="toolbar">
       <div class="quant-tabs">
@@ -159,6 +182,7 @@
 <script src="js/models.js"></script>
 <script src="js/estimate.js"></script>
 <script src="js/hardware.js"></script>
+<script src="js/model-sync.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

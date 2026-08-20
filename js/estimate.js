@@ -22,6 +22,13 @@ function bytesPerTokenGB(model, quant) {
 
 /* ---------------- GPU 数据库（显存 GB / 带宽 GB/s） ---------------- */
 const GPU_DB = [
+  // NVIDIA 50 系
+  { re: /rtx\s*5090(?!\s*laptop)/i,       name: 'RTX 5090',        vram: 32, bw: 1792, kind: 'nvidia' },
+  { re: /rtx\s*5080(?!\s*laptop)/i,       name: 'RTX 5080',        vram: 16, bw: 960,  kind: 'nvidia' },
+  { re: /rtx\s*5070\s*ti(?!\s*laptop)/i, name: 'RTX 5070 Ti',     vram: 16, bw: 896,  kind: 'nvidia' },
+  { re: /rtx\s*5070(?!\s*laptop)/i,       name: 'RTX 5070',        vram: 12, bw: 672,  kind: 'nvidia' },
+  { re: /rtx\s*5060\s*ti(?!\s*laptop)/i, name: 'RTX 5060 Ti',     vram: 16, bw: 448,  kind: 'nvidia' },
+  { re: /rtx\s*5060(?!\s*laptop)/i,       name: 'RTX 5060',        vram: 8,  bw: 448,  kind: 'nvidia' },
   // NVIDIA 40 系（负向前瞻避免误吞 Laptop 版）
   { re: /rtx\s*4090(?!\s*laptop)/i,  name: 'RTX 4090',        vram: 24, bw: 1008, kind: 'nvidia' },
   { re: /rtx\s*4080(?!\s*laptop)/i,   name: 'RTX 4080 (Super)', vram: 16, bw: 736,  kind: 'nvidia' },
@@ -53,9 +60,22 @@ const GPU_DB = [
   { re: /rtx\s*4060\s*laptop/i,       name: 'RTX 4060 Laptop', vram: 8,  bw: 256,  kind: 'nvidia' },
   { re: /rtx\s*3060\s*laptop/i,       name: 'RTX 3060 Laptop', vram: 6,  bw: 336,  kind: 'nvidia' },
   { re: /rtx\s*3050/i,                name: 'RTX 3050',        vram: 8,  bw: 224,  kind: 'nvidia' },
+  { re: /rtx\s*5090\s*laptop/i,       name: 'RTX 5090 Laptop',  vram: 24, bw: 896,  kind: 'nvidia' },
+  { re: /rtx\s*5080\s*laptop/i,       name: 'RTX 5080 Laptop',  vram: 16, bw: 512,  kind: 'nvidia' },
+  { re: /rtx\s*5070\s*ti\s*laptop/i, name: 'RTX 5070 Ti Laptop', vram: 12, bw: 448, kind: 'nvidia' },
+  { re: /rtx\s*5070\s*laptop/i,       name: 'RTX 5070 Laptop',  vram: 8,  bw: 384,  kind: 'nvidia' },
+  { re: /rtx\s*5060\s*laptop/i,       name: 'RTX 5060 Laptop',  vram: 8,  bw: 384,  kind: 'nvidia' },
+  // NVIDIA 专业卡与常见服务器卡
+  { re: /rtx\s*a6000/i,               name: 'RTX A6000',        vram: 48, bw: 768,  kind: 'nvidia' },
+  { re: /rtx\s*a5000/i,               name: 'RTX A5000',        vram: 24, bw: 768,  kind: 'nvidia' },
+  { re: /rtx\s*a4000/i,               name: 'RTX A4000',        vram: 16, bw: 448,  kind: 'nvidia' },
+  { re: /quadro\s*rtx\s*8000/i,      name: 'Quadro RTX 8000',  vram: 48, bw: 672,  kind: 'nvidia' },
+  { re: /tesla\s*v100/i,              name: 'Tesla V100',       vram: 16, bw: 900,  kind: 'nvidia' },
+  { re: /tesla\s*t4/i,                name: 'Tesla T4',         vram: 16, bw: 320,  kind: 'nvidia' },
   // AMD RDNA4/3
   { re: /rx\s*9070\s*xt/i,            name: 'RX 9070 XT',      vram: 16, bw: 644,  kind: 'amd' },
   { re: /rx\s*9070/i,                 name: 'RX 9070',         vram: 16, bw: 500,  kind: 'amd' },
+  { re: /rx\s*9060\s*xt/i,            name: 'RX 9060 XT',       vram: 16, bw: 320,  kind: 'amd' },
   { re: /rx\s*7900\s*xtx/i,           name: 'RX 7900 XTX',     vram: 24, bw: 960,  kind: 'amd' },
   { re: /rx\s*7900\s*xt/i,            name: 'RX 7900 XT',      vram: 20, bw: 800,  kind: 'amd' },
   { re: /rx\s*7800\s*xt/i,            name: 'RX 7800 XT',      vram: 16, bw: 624,  kind: 'amd' },
@@ -65,11 +85,20 @@ const GPU_DB = [
   { re: /rx\s*6800\s*xt/i,            name: 'RX 6800 XT',      vram: 16, bw: 512,  kind: 'amd' },
   { re: /rx\s*6700\s*xt/i,            name: 'RX 6700 XT',      vram: 12, bw: 384,  kind: 'amd' },
   { re: /rx\s*6600/i,                 name: 'RX 6600',         vram: 8,  bw: 256,  kind: 'amd' },
+  { re: /rx\s*6500\s*xt/i,            name: 'RX 6500 XT',       vram: 4,  bw: 144,  kind: 'amd' },
+  // AMD 专业卡与集成显卡
+  { re: /radeon\s*pro\s*w7900/i,      name: 'Radeon Pro W7900', vram: 48, bw: 864, kind: 'amd' },
+  { re: /radeon\s*pro\s*w7800/i,      name: 'Radeon Pro W7800', vram: 32, bw: 576, kind: 'amd' },
+  { re: /radeon\s*pro\s*w6800/i,      name: 'Radeon Pro W6800', vram: 32, bw: 512, kind: 'amd' },
+  { re: /radeon\s*780m/i,              name: 'Radeon 780M',      vram: null, bw: 89, kind: 'igpu' },
+  { re: /radeon\s*760m/i,              name: 'Radeon 760M',      vram: null, bw: 76, kind: 'igpu' },
   // Intel 独显
   { re: /arc\s*a770/i,                name: 'Arc A770',        vram: 16, bw: 560,  kind: 'intel' },
   { re: /arc\s*a750/i,                name: 'Arc A750',        vram: 8,  bw: 512,  kind: 'intel' },
   { re: /arc\s*b580/i,                name: 'Arc B580',        vram: 12, bw: 456,  kind: 'intel' },
   { re: /arc\s*b570/i,                name: 'Arc B570',        vram: 10, bw: 380,  kind: 'intel' },
+  { re: /arc\s*a380/i,                name: 'Arc A380',        vram: 6,  bw: 186,   kind: 'intel' },
+  { re: /intel\s*(uhd|iris|xe)/i,     name: 'Intel UHD / Iris Xe', vram: null, bw: null, kind: 'igpu' },
   // Apple Silicon（带宽 GB/s）
   { re: /apple\s*m4\s*(pro|max)?/i,   name: 'Apple M4',        vram: null, bw: 273,  kind: 'apple' },
   { re: /apple\s*m3\s*(pro|max)?/i,   name: 'Apple M3',        vram: null, bw: 150,  kind: 'apple' },
@@ -78,6 +107,16 @@ const GPU_DB = [
   // 集显（最后兜底匹配，因子低）
   { re: /uhd|iris|hd\s*graphics|radeon\s*graphics|radeon\s*vega|radeon\s*\d+\s*series/i, name: '核显 iGPU', vram: null, bw: null, kind: 'igpu' },
 ];
+
+// 手动修正面板使用的统一厂商标签；估算逻辑仍沿用 kind 字段。
+const GPU_VENDOR_LABELS = {
+  nvidia: 'NVIDIA', amd: 'AMD', intel: 'Intel', apple: 'Apple Silicon', igpu: '核显 / 集成显卡',
+};
+GPU_DB.forEach((gpu) => {
+  gpu.vendor = gpu.vendor || GPU_VENDOR_LABELS[gpu.kind] || '其他';
+  gpu.series = gpu.series || gpu.vendor;
+});
+if (typeof window !== 'undefined') window.GPU_CATALOG = GPU_DB;
 
 const GPU_SPEED_FACTOR = { nvidia: 0.75, amd: 0.68, intel: 0.30, apple: 0.60, igpu: 0.16 };
 const MOE_FACTOR = 0.55; // MoE 路由与负载均衡开销

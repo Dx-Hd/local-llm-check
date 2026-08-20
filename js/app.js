@@ -6,6 +6,7 @@ let HW = null;       // 当前硬件信息
 let quant = 'Q4_K_M';
 let filterTag = '全部';
 let sortMode = 'speed';
+const GPU_VENDOR_ORDER = ['NVIDIA', 'AMD', 'Intel', 'Apple Silicon', '核显 / 集成显卡'];
 
 const $ = (id) => document.getElementById(id);
 
@@ -23,12 +24,12 @@ async function doDetect() {
     $('status').textContent = '检测失败：' + e.message;
   } finally {
     $('btn-detect').disabled = false;
-    $('btn-detect').textContent = '重新检测';
+    $('btn-detect').textContent = '重新检测配置';
   }
 }
 
 function renderSpecs() {
-  const gpuName = HW.gpu ? HW.gpu.name : (HW.gpuString ? '未收录型号' : '未检测到');
+  const gpuName = HW.gpu ? HW.gpu.name : (HW.gpuString === '手动设置' ? '未使用独立 GPU' : (HW.gpuString ? '未收录型号' : '未检测到'));
   $('spec-cpu').textContent = HW.cpuCores ? `${HW.cpuCores} 核（逻辑）` : '未知（请手动设置）';
   $('spec-ram').textContent = HW.ramGB ? `约 ${HW.ramGB} GB（浏览器粗估）` : '未知（请手动设置）';
   $('spec-gpu').textContent = HW.gpuString ? `${gpuName}（${HW.gpuString.slice(0, 60)}）` : '未检测到独立 GPU（可能为核显）';
@@ -40,27 +41,74 @@ function renderSpecs() {
 
 function showManual() {
   const gpuSel = $('manual-gpu');
-  gpuSel.innerHTML = '';
-  const opts = [['', '（使用自动检测的 GPU）'], ['none', '无独立显卡（纯 CPU）']];
-  for (const g of GPU_DB) opts.push([g.name, g.name + (g.vram ? `（${g.vram}GB）` : '')]);
-  for (const [v, label] of opts) {
+  gpuSel.innerHTML = '<option value="">（使用自动检测的 GPU）</option><option value="none">无独立显卡（纯 CPU）</option>';
+  const groups = new Map();
+  GPU_VENDOR_ORDER.forEach((vendor) => {
+    const group = document.createElement('optgroup');
+    group.label = vendor;
+    groups.set(vendor, group);
+    gpuSel.appendChild(group);
+  });
+  for (const g of GPU_DB) {
     const o = document.createElement('option');
-    o.value = v; o.textContent = label;
-    if ((HW.gpu && HW.gpu.name === v) || (!HW.gpu && v === 'none')) o.selected = true;
-    gpuSel.appendChild(o);
+    o.value = g.name;
+    o.dataset.vendor = g.vendor || '其他';
+    o.textContent = g.name + (g.vram ? `（${g.vram}GB）` : '（共享/统一内存）');
+    if (HW.gpu && HW.gpu.name === g.name) o.selected = true;
+    (groups.get(g.vendor) || gpuSel).appendChild(o);
   }
+  const other = document.createElement('option');
+  other.value = 'other';
+  other.textContent = '其他型号（手动填写）';
+  gpuSel.appendChild(other);
+  if (HW.gpu && !GPU_DB.some((g) => g.name === HW.gpu.name)) gpuSel.value = 'other';
   $('manual-cores').value = HW.cpuCores || 8;
   $('manual-ram').value = HW.ramGB || 16;
   $('manual-vram').value = HW.gpuVram || (HW.gpu && HW.gpu.vram) || '';
   $('manual-tier').value = HW.ramTier || 'unknown';
+  $('manual-gpu-kind').value = HW.gpu ? HW.gpu.kind : 'nvidia';
+  $('manual-gpu-search').value = '';
+  $('manual-custom-name').value = HW.gpu && !GPU_DB.some((g) => g.name === HW.gpu.name) ? HW.gpu.name : '';
+  toggleCustomGpuFields();
+}
+
+function toggleCustomGpuFields() {
+  const custom = $('manual-gpu').value === 'other';
+  $('manual-custom-name-wrap').style.display = custom ? 'flex' : 'none';
+  if (!custom) $('manual-custom-name').value = '';
+}
+
+function handleGpuSelectionChange() {
+  const choice = $('manual-gpu').value;
+  const selected = GPU_DB.find((gpu) => gpu.name === choice);
+  if (selected) {
+    $('manual-gpu-kind').value = selected.kind;
+    $('manual-vram').value = selected.vram || '';
+  } else if (choice === 'none') {
+    $('manual-vram').value = '';
+  }
+  toggleCustomGpuFields();
+}
+
+function filterManualGpuOptions() {
+  const query = $('manual-gpu-search').value.trim().toLowerCase();
+  $('manual-gpu').querySelectorAll('option').forEach((option) => {
+    option.hidden = Boolean(query) && !option.textContent.toLowerCase().includes(query);
+  });
+  $('manual-gpu').querySelectorAll('optgroup').forEach((group) => {
+    group.hidden = [...group.options].every((option) => option.hidden);
+  });
 }
 
 /* ---------------- 手动修正 ---------------- */
 function applyManual() {
+  const choice = $('manual-gpu').value;
   const overrides = {
     cpuCores: +$('manual-cores').value,
     ramGB: +$('manual-ram').value,
-    gpuChoice: $('manual-gpu').value,
+    gpuChoice: choice,
+    gpuCustomName: $('manual-custom-name').value.trim(),
+    gpuKind: $('manual-gpu-kind').value,
     gpuVram: $('manual-vram').value ? +$('manual-vram').value : null,
     ramTier: $('manual-tier').value,
   };
@@ -70,7 +118,9 @@ function applyManual() {
   HW = { ...{ cpuCores: overrides.cpuCores, ramGB: overrides.ramGB, gpuVram: overrides.gpuVram, gpuBw: overrides.gpuBw, ramTier: overrides.ramTier, gpu: null, os: 'manual', apple: false, gpuString: '手动设置', diskFreeGB: null } };
   const gpuChoice = overrides.gpuChoice;
   if (gpuChoice && gpuChoice !== 'none') {
-    const g = GPU_DB.find((x) => x.name === gpuChoice);
+    const g = gpuChoice === 'other'
+      ? { name: overrides.gpuCustomName || '自定义 GPU', vram: overrides.gpuVram, bw: overrides.gpuBw, kind: overrides.gpuKind || 'nvidia', vendor: '自定义' }
+      : GPU_DB.find((x) => x.name === gpuChoice);
     if (g) HW.gpu = g;
   }
   renderSpecs();
@@ -215,11 +265,85 @@ function renderChart(rows) {
     </div>`).join('');
 }
 
+function renderLiveModels(result) {
+  const box = $('live-models');
+  if (!box) return;
+  box.innerHTML = '';
+  const entries = (result && result.entries) || [];
+  if (!entries.length) {
+    box.innerHTML = '<p class="empty live-empty">暂时没有在线模型数据，内置模型库仍可正常使用。</p>';
+    return;
+  }
+  const title = document.createElement('div');
+  title.className = 'live-heading';
+  title.textContent = `最新发现 · ${Math.min(entries.length, 18)} 条`;
+  box.appendChild(title);
+  entries.slice(0, 18).forEach((entry) => {
+    const card = document.createElement('article');
+    card.className = 'live-model';
+    const source = document.createElement('span');
+    source.className = 'source-chip';
+    source.textContent = entry.source;
+    const link = document.createElement('a');
+    link.href = entry.url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = entry.name;
+    const meta = document.createElement('div');
+    meta.className = 'live-meta';
+    meta.textContent = `${entry.downloads ? `${entry.downloads.toLocaleString()} 次下载/收藏` : '暂无热度数据'}${entry.needsReview ? ' · 参数/体积待核对' : ''}`;
+    card.append(source, link, meta);
+    box.appendChild(card);
+  });
+}
+
+function updateModelSyncStatus(result, loading = false) {
+  const status = $('model-sync-status');
+  if (!status) return;
+  if (loading) {
+    status.textContent = '正在从 Hugging Face、ModelScope、GitHub 获取最新公开目录…';
+    return;
+  }
+  const updated = result && result.updatedAt ? new Date(result.updatedAt).toLocaleString('zh-CN', { hour12: false }) : '暂无成功更新';
+  const sources = result && result.sources && result.sources.length ? result.sources.join('、') : '缓存';
+  const failed = result && result.failedSources && result.failedSources.length ? `；失败：${result.failedSources.join('、')}` : '';
+  status.textContent = `上次更新：${updated} · 已接入：${sources}${failed}`;
+}
+
+async function doSyncModels() {
+  const button = $('btn-sync-models');
+  if (!button || !window.ModelSync) return;
+  button.disabled = true;
+  button.textContent = '更新中…';
+  updateModelSyncStatus(null, true);
+  try {
+    const result = await window.ModelSync.refresh();
+    renderLiveModels(result);
+    updateModelSyncStatus(result);
+  } catch (error) {
+    const cached = window.ModelSync.loadCachedCatalog();
+    renderLiveModels(cached);
+    updateModelSyncStatus({ ...cached, failedSources: ['全部来源'] });
+  } finally {
+    button.disabled = false;
+    button.textContent = '↻ 更新模型库';
+  }
+}
+
 /* ---------------- 事件绑定 ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
   $('btn-detect').addEventListener('click', doDetect);
   $('btn-bench').addEventListener('click', doBench);
   $('btn-apply-manual').addEventListener('click', applyManual);
+  $('manual-gpu').addEventListener('change', handleGpuSelectionChange);
+  $('manual-gpu-search').addEventListener('input', filterManualGpuOptions);
+  $('btn-sync-models').addEventListener('click', doSyncModels);
+
+  const cachedModels = window.ModelSync && window.ModelSync.loadCachedCatalog();
+  if (cachedModels) {
+    renderLiveModels(cachedModels);
+    updateModelSyncStatus(cachedModels);
+  }
 
   document.querySelectorAll('.quant-tab').forEach((el) => {
     el.addEventListener('click', () => {
@@ -252,6 +376,4 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // 自动检测一次
-  doDetect();
 });

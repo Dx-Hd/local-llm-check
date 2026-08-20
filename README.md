@@ -6,9 +6,11 @@
 ## 功能
 
 - **浏览器端硬件检测**：CPU 核心数、内存（Chromium 粗估）、GPU 型号（WebGL）、磁盘空间，附手动修正面板（localStorage 持久化）
+- **主动检测与完整 GPU 修正**：点击“检测本机配置”后开始检测；手动面板按 NVIDIA / AMD / Intel / Apple Silicon 分组，覆盖常见桌面卡、移动卡、专业卡和核显，并支持自定义型号与显存
 - **兼容性判断**：按量化等级（Q4_K_M / Q8_0 / FP16）计算内存/显存需求，给出 可运行 / 受限 / 内存不足 三级结论
 - **速度对比**：基于「内存带宽决定生成速度」的物理模型 + 社区基准因子估算 tok/s，支持排序、筛选、条形图对比、可选浏览器基准校准
 - **下载集成**：每个模型带 HuggingFace / ModelScope 直达链接 + 一键复制 `ollama pull` 命令
+- **模型目录更新**：可从 Hugging Face、ModelScope、GitHub 的公开接口更新最新发现，使用浏览器缓存和内置模型 fallback，不要求 Token
 - **部署教程**：Ollama、LM Studio、llama.cpp、vLLM 完整步骤 + 量化科普 + FAQ
 
 ## 技术栈
@@ -22,6 +24,7 @@ css/style.css      样式（深色主题）
 js/models.js       模型数据库（体积/链接/ollama 命令）
 js/estimate.js     GPU 数据库 + 需求计算 + 速度估算引擎
 js/hardware.js     浏览器硬件检测 + 手动覆盖 + 基准校准
+js/model-sync.js   Hugging Face / ModelScope / GitHub 公开目录同步与缓存
 js/app.js          页面交互逻辑
 ```
 

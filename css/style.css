@@ -11,6 +11,8 @@
   --muted: #8d96c4;
   --accent: #5b8cff;
   --accent2: #8b5cff;
+  --cyan: #63e6e2;
+  --orange: #ff9b62;
   --green: #4ade80;
   --yellow: #facc15;
   --red: #f87171;
@@ -23,7 +25,7 @@
 html { scroll-behavior: smooth; }
 
 body {
-  font-family: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  font-family: "Aptos", "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
   background:
     radial-gradient(1000px 500px at 15% -100px, rgba(91, 140, 255, 0.12), transparent 60%),
     radial-gradient(800px 400px at 85% -80px, rgba(139, 92, 255, 0.10), transparent 60%),
@@ -52,10 +54,21 @@ body {
     radial-gradient(1200px 420px at 50% -120px, rgba(91, 140, 255, 0.22), transparent 65%),
     radial-gradient(900px 320px at 82% -60px, rgba(139, 92, 255, 0.18), transparent 60%);
   border-bottom: 1px solid var(--border);
-  padding: 58px 0 40px;
+  padding: 70px 0 48px;
   text-align: center;
   position: relative;
   overflow: hidden;
+}
+.hero::before {
+  content: "LOCAL INFERENCE / HARDWARE FIT";
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(99, 230, 226, 0.62);
+  font: 700 0.68rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
 }
 .hero::after {
   content: "";
@@ -102,10 +115,14 @@ body {
 .btn.primary:hover { filter: brightness(1.12); box-shadow: 0 12px 34px rgba(91, 140, 255, 0.45); }
 .btn.primary:disabled { opacity: 0.6; cursor: wait; transform: none; filter: none; }
 .btn.ghost { background: rgba(18, 26, 56, 0.6); }
+.btn:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
 
 /* ---------- 卡片 ---------- */
 .card {
-  background: linear-gradient(180deg, var(--card) 0%, var(--card2) 100%);
+  background: linear-gradient(145deg, rgba(18, 26, 56, 0.96) 0%, rgba(23, 32, 74, 0.88) 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 26px 28px;
@@ -190,6 +207,8 @@ body {
 }
 .manual-grid input:focus, .manual-grid select:focus { border-color: var(--accent); }
 .manual-apply { align-self: end; }
+#manual-gpu-search { margin-bottom: 2px; }
+#manual-custom-name-wrap { color: var(--orange); }
 
 /* ---------- 工具栏 ---------- */
 .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
@@ -239,6 +258,30 @@ body {
   transition: border-color 0.15s;
 }
 .toolbar-right input:focus, .toolbar-right select:focus { border-color: var(--accent); }
+
+/* ---------- 在线模型目录 ---------- */
+.model-sync-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  margin: -2px 0 16px;
+  border: 1px solid rgba(99, 230, 226, 0.2);
+  border-radius: 12px;
+  background: linear-gradient(100deg, rgba(99, 230, 226, 0.08), rgba(91, 140, 255, 0.08));
+}
+.sync-title { font-weight: 700; letter-spacing: 0.02em; }
+.sync-status { color: var(--muted); font-size: 0.78rem; margin-top: 3px; }
+.sync-button { flex: 0 0 auto; padding: 9px 15px; box-shadow: none; }
+.live-models { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 9px; margin: 0 0 18px; }
+.live-heading { grid-column: 1 / -1; color: var(--cyan); font: 700 0.75rem/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: 0.1em; text-transform: uppercase; }
+.live-model { display: grid; gap: 5px; padding: 12px 13px; border: 1px solid rgba(35, 45, 94, 0.9); border-radius: 10px; background: rgba(7, 11, 24, 0.42); }
+.live-model a { color: var(--text); font-size: 0.88rem; font-weight: 650; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-model a:hover { color: var(--cyan); }
+.source-chip { width: max-content; padding: 2px 7px; border-radius: 999px; color: var(--orange); border: 1px solid rgba(255, 155, 98, 0.26); font-size: 0.68rem; }
+.live-meta { color: var(--muted); font-size: 0.72rem; }
+.live-empty { grid-column: 1 / -1; padding: 12px !important; }
 
 /* ---------- 表格 ---------- */
 .table-scroll { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
@@ -370,8 +413,15 @@ footer a:hover { color: #9db8ff; }
 .tag.hard { background: rgba(248, 113, 113, 0.14); color: var(--red); }
 
 @media (max-width: 720px) {
+  .hero { padding-top: 58px; }
   .hero h1 { font-size: 1.6rem; }
   .bar-label { width: 120px; }
   .toolbar-right { margin-left: 0; width: 100%; }
   .toolbar-right input { flex: 1; }
+  .model-sync-panel { align-items: flex-start; flex-direction: column; }
+  .sync-button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
