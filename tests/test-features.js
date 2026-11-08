@@ -110,8 +110,111 @@ async function testModelRefreshPartialFailure() {
   assert.ok(result.failedSources.includes('ModelScope'));
 }
 
+function testGpuMatchingAndMemory() {
+  const context = load('js/estimate.js');
+  for (const [raw, name, bw] of [
+    ['NVIDIA GeForce RTX 5070 Ti Laptop GPU', 'RTX 5070 Ti Laptop', 448],
+    ['NVIDIA GeForce RTX 5070 Ti', 'RTX 5070 Ti', 896],
+    ['NVIDIA GeForce RTX 5070', 'RTX 5070', 672],
+    ['RTX 5070 Laptop GPU', 'RTX 5070 Laptop', 384],
+  ]) {
+    const gpu = context.matchGPU(raw);
+    assert.equal(gpu.name, name);
+    assert.equal(gpu.bw, bw);
+  }
+  assert.equal(context.matchGPU('RTX 50700'), null);
+  const model = { params: 20, quant: { Q4_K_M: 10 } };
+  for (const name of ['RTX 5060 Ti', 'RX 9060 XT']) {
+    const gpu = context.matchGPU(name);
+    assert.equal(gpu.name, name);
+    assert.equal(gpu.vram, null);
+    const hw = { gpu, ramGB: 64, cpuCores: 8, ramTier: 'ddr5-dual' };
+    assert.equal(context.checkFit(model, 'Q4_K_M', hw).level, 'yellow');
+    assert.match(context.checkFit(model, 'Q4_K_M', hw).reason, /手动确认/);
+    assert.match(context.estSpeed(model, 'Q4_K_M', hw).note, /显存未知/);
+    const eight = { ...hw, gpuVram: 8 };
+    const sixteen = { ...hw, gpuVram: 16 };
+    assert.equal(context.checkFit(model, 'Q4_K_M', eight).level, 'yellow');
+    assert.equal(context.checkFit(model, 'Q4_K_M', sixteen).level, 'green');
+    assert.equal(context.estSpeed(model, 'Q4_K_M', eight).mode, 'offload');
+    assert.equal(context.estSpeed(model, 'Q4_K_M', sixteen).mode, 'gpu');
+    assert.ok(context.estSpeed(model, 'Q4_K_M', eight).speed < context.estSpeed(model, 'Q4_K_M', sixteen).speed);
+  }
+  const overridden = { gpu: context.matchGPU('RTX 5070 Ti'), gpuVram: 8, ramGB: 64 };
+  assert.equal(context.checkFit(model, 'Q4_K_M', overridden).level, 'yellow');
+  assert.equal(context.estSpeed(model, 'Q4_K_M', overridden).mode, 'offload');
+}
+
+function testManualGpuMemoryUi() {
+  const nodes = new Map();
+  const element = () => ({
+    value: '', textContent: '', innerHTML: '', style: {}, dataset: {}, children: [],
+    appendChild(child) { this.children.push(child); },
+  });
+  const context = load('js/estimate.js', {
+    document: {
+      getElementById(id) {
+        if (!nodes.has(id)) nodes.set(id, element());
+        return nodes.get(id);
+      },
+      createElement: element,
+      addEventListener() {},
+    },
+    saveOverride(value) { context.saved = value; },
+  });
+  loadInto(context, 'js/app.js');
+  vm.runInNewContext('renderTable = function () {};', context);
+  const model = { params: 20, quant: { Q4_K_M: 10 } };
+  for (const name of ['RTX 5060 Ti', 'RX 9060 XT']) {
+    context.testGpu = context.matchGPU(name);
+    vm.runInNewContext('HW = { gpu: testGpu, gpuString: testGpu.name, ramGB: 64 }; renderSpecs(); showManual();', context);
+    assert.match(nodes.get('spec-vram').textContent, /手动确认/);
+    const options = nodes.get('manual-gpu').children.flatMap((group) => group.children || []);
+    const option = options.find((entry) => entry.value === name);
+    assert.ok(option);
+    assert.match(option.textContent, /手动确认/);
+    assert.doesNotMatch(option.textContent, /共享/);
+    for (const choice of [name, '']) {
+      for (const vram of [8, 16]) {
+        nodes.get('manual-gpu').value = choice;
+        if (choice) context.handleGpuSelectionChange();
+        nodes.get('manual-vram').value = String(vram);
+        context.applyManual();
+        assert.equal(nodes.get('spec-vram').textContent, `${vram} GB`);
+        assert.equal(context.saved.gpuVram, vram);
+        const hw = vm.runInNewContext('HW', context);
+        assert.equal(hw.gpu.name, name);
+        assert.equal(context.checkFit(model, 'Q4_K_M', hw).level, vram === 8 ? 'yellow' : 'green');
+        assert.equal(context.estSpeed(model, 'Q4_K_M', hw).mode, vram === 8 ? 'offload' : 'gpu');
+      }
+    }
+  }
+}
+
+async function testPersistedGpuMemory() {
+  const context = load('js/estimate.js', {
+    navigator: { hardwareConcurrency: 8, deviceMemory: 64, platform: 'Win32' },
+    document: { createElement: () => ({ getContext: () => null }) },
+  });
+  loadInto(context, 'js/hardware.js');
+  const model = { params: 20, quant: { Q4_K_M: 10 } };
+  for (const name of ['RTX 5060 Ti', 'RX 9060 XT']) {
+    for (const vram of [8, 16]) {
+      context.localStorage = createStorage({ llmh_hw_v1: JSON.stringify({ gpuChoice: name, gpuVram: vram }) });
+      const hw = await context.detectHardware();
+      assert.equal(hw.gpu.name, name);
+      assert.equal(hw.gpuVram, vram);
+      assert.equal(context.checkFit(model, 'Q4_K_M', hw).level, vram === 8 ? 'yellow' : 'green');
+      assert.equal(context.estSpeed(model, 'Q4_K_M', hw).mode, vram === 8 ? 'offload' : 'gpu');
+    }
+  }
+}
+
 async function main() {
   testGpuCatalog();
+  testGpuMatchingAndMemory();
+  testManualGpuMemoryUi();
+  await testPersistedGpuMemory();
   testModelNormalizationAndMerge();
   await testCustomGpuOverride();
   await testModelRefreshPartialFailure();

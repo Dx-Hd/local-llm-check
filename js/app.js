@@ -33,7 +33,9 @@ function renderSpecs() {
   $('spec-cpu').textContent = HW.cpuCores ? `${HW.cpuCores} 核（逻辑）` : '未知（请手动设置）';
   $('spec-ram').textContent = HW.ramGB ? `约 ${HW.ramGB} GB（浏览器粗估）` : '未知（请手动设置）';
   $('spec-gpu').textContent = HW.gpuString ? `${gpuName}（${HW.gpuString.slice(0, 60)}）` : '未检测到独立 GPU（可能为核显）';
-  $('spec-vram').textContent = (HW.gpu && HW.gpu.vram) ? `${HW.gpu.vram} GB` : (HW.gpuVram ? `${HW.gpuVram} GB` : '未知');
+  const vram = HW.gpuVram || (HW.gpu && HW.gpu.vram);
+  const unknownDiscrete = HW.gpu && !['igpu', 'apple'].includes(HW.gpu.kind);
+  $('spec-vram').textContent = vram ? `${vram} GB` : (unknownDiscrete ? '未知（请手动确认显存）' : '未知');
   $('spec-disk').textContent = HW.diskFreeGB ? `约 ${HW.diskFreeGB} GB（浏览器估算）` : '未知';
   $('spec-os').textContent = HW.apple ? 'macOS (Apple Silicon)' : (HW.os || '未知');
   $('specs-box').style.display = 'block';
@@ -53,7 +55,7 @@ function showManual() {
     const o = document.createElement('option');
     o.value = g.name;
     o.dataset.vendor = g.vendor || '其他';
-    o.textContent = g.name + (g.vram ? `（${g.vram}GB）` : '（共享/统一内存）');
+    o.textContent = g.name + (g.vram ? `（${g.vram}GB）` : (['igpu', 'apple'].includes(g.kind) ? '（共享/统一内存）' : '（显存未知，请手动确认 8GB/16GB）'));
     if (HW.gpu && HW.gpu.name === g.name) o.selected = true;
     (groups.get(g.vendor) || gpuSel).appendChild(o);
   }
@@ -114,9 +116,11 @@ function applyManual() {
   };
   if ($('manual-vram').value) overrides.gpuBw = 300; // 未知带宽的中档默认
   saveOverride(overrides);
+  const detectedGpu = HW && HW.gpu;
   HW = null; // 强制重新加载
   HW = { ...{ cpuCores: overrides.cpuCores, ramGB: overrides.ramGB, gpuVram: overrides.gpuVram, gpuBw: overrides.gpuBw, ramTier: overrides.ramTier, gpu: null, os: 'manual', apple: false, gpuString: '手动设置', diskFreeGB: null } };
   const gpuChoice = overrides.gpuChoice;
+  if (!gpuChoice) HW.gpu = detectedGpu;
   if (gpuChoice && gpuChoice !== 'none') {
     const g = gpuChoice === 'other'
       ? { name: overrides.gpuCustomName || '自定义 GPU', vram: overrides.gpuVram, bw: overrides.gpuBw, kind: overrides.gpuKind || 'nvidia', vendor: '自定义' }

@@ -25,9 +25,9 @@ const GPU_DB = [
   // NVIDIA 50 系
   { re: /rtx\s*5090(?!\s*laptop)/i,       name: 'RTX 5090',        vram: 32, bw: 1792, kind: 'nvidia' },
   { re: /rtx\s*5080(?!\s*laptop)/i,       name: 'RTX 5080',        vram: 16, bw: 960,  kind: 'nvidia' },
-  { re: /rtx\s*5070\s*ti(?!\s*laptop)/i, name: 'RTX 5070 Ti',     vram: 16, bw: 896,  kind: 'nvidia' },
-  { re: /rtx\s*5070(?!\s*laptop)/i,       name: 'RTX 5070',        vram: 12, bw: 672,  kind: 'nvidia' },
-  { re: /rtx\s*5060\s*ti(?!\s*laptop)/i, name: 'RTX 5060 Ti',     vram: 16, bw: 448,  kind: 'nvidia' },
+  { re: /rtx\s*5070\s*ti\b(?!\s*laptop)/i, name: 'RTX 5070 Ti',     vram: 16, bw: 896,  kind: 'nvidia' },
+  { re: /rtx\s*5070\b(?!\s*(?:ti|laptop))/i,       name: 'RTX 5070',        vram: 12, bw: 672,  kind: 'nvidia' },
+  { re: /rtx\s*5060\s*ti(?!\s*laptop)/i, name: 'RTX 5060 Ti',     vram: null, bw: 448,  kind: 'nvidia' },
   { re: /rtx\s*5060(?!\s*laptop)/i,       name: 'RTX 5060',        vram: 8,  bw: 448,  kind: 'nvidia' },
   // NVIDIA 40 系（负向前瞻避免误吞 Laptop 版）
   { re: /rtx\s*4090(?!\s*laptop)/i,  name: 'RTX 4090',        vram: 24, bw: 1008, kind: 'nvidia' },
@@ -75,7 +75,7 @@ const GPU_DB = [
   // AMD RDNA4/3
   { re: /rx\s*9070\s*xt/i,            name: 'RX 9070 XT',      vram: 16, bw: 644,  kind: 'amd' },
   { re: /rx\s*9070/i,                 name: 'RX 9070',         vram: 16, bw: 500,  kind: 'amd' },
-  { re: /rx\s*9060\s*xt/i,            name: 'RX 9060 XT',       vram: 16, bw: 320,  kind: 'amd' },
+  { re: /rx\s*9060\s*xt/i,            name: 'RX 9060 XT',       vram: null, bw: 320,  kind: 'amd' },
   { re: /rx\s*7900\s*xtx/i,           name: 'RX 7900 XTX',     vram: 24, bw: 960,  kind: 'amd' },
   { re: /rx\s*7900\s*xt/i,            name: 'RX 7900 XT',      vram: 20, bw: 800,  kind: 'amd' },
   { re: /rx\s*7800\s*xt/i,            name: 'RX 7800 XT',      vram: 16, bw: 624,  kind: 'amd' },
@@ -173,8 +173,8 @@ function estSpeed(model, quant, hw) {
     };
   }
 
-  if (gpu && gpu.kind !== 'igpu' && (gpu.vram || hw.gpuVram)) {
-    const vram = gpu.vram || hw.gpuVram;
+  if (gpu && gpu.kind !== 'igpu' && (hw.gpuVram || gpu.vram)) {
+    const vram = hw.gpuVram || gpu.vram;
     if (vram >= vramNeedGB(model, quant)) {
       // 全量进显存
       let bw = gpu.bw;
@@ -204,7 +204,12 @@ function estSpeed(model, quant, hw) {
       };
     }
   }
-  return { speed: cpuSpeed(model, quant, hw), mode: 'cpu', note: 'CPU 推理（无可用独立显卡）' };
+  return {
+    speed: cpuSpeed(model, quant, hw), mode: 'cpu',
+    note: gpu && gpu.kind !== 'igpu'
+      ? '独立显卡显存未知，请手动确认显存；暂按 CPU 估算'
+      : 'CPU 推理（无可用独立显卡）',
+  };
 }
 
 function cpuSpeed(model, quant, hw) {
@@ -246,7 +251,10 @@ function checkFit(model, quant, hw) {
   }
 
   if (gpu && gpu.kind !== 'igpu') {
-    const vram = gpu.vram || hw.gpuVram;
+    const vram = hw.gpuVram || gpu.vram;
+    if (!vram) {
+      return { ok: true, level: 'yellow', reason: '独立显卡显存未知，请手动确认显存后判断 GPU 兼容性' };
+    }
     if (vram && vram >= vNeed) {
       return { ok: true, level: 'green', reason: `可全量 GPU 运行（需显存 ≥${vNeed.toFixed(1)}GB）` };
     }
