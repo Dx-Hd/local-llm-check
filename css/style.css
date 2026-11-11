@@ -416,7 +416,7 @@ footer a:hover { color: #9db8ff; }
   .hero { padding-top: 58px; }
   .hero h1 { font-size: 1.6rem; }
   .bar-label { width: 120px; }
-  .toolbar-right { margin-left: 0; width: 100%; }
+  .toolbar-right { margin-left: 0; width: 100%; flex-wrap: wrap; }
   .toolbar-right input { flex: 1; }
   .model-sync-panel { align-items: flex-start; flex-direction: column; }
   .sync-button { width: 100%; }
